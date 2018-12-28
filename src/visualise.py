@@ -8,7 +8,8 @@ import webbrowser
 
 
 def tb_view(model, logdir=None, cmd=None):
-    """Visualises a :model: in TensorBoard.
+    """Visualises a :model: in TensorBoard. (That is, everything in the model's Graph, which may actually be much larger
+    than the model itself.)
 
     TensorBoard should automatically open; it is inconsistent whether the browser will automatically come to the front
     though.
