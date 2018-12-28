@@ -54,6 +54,7 @@ _REENTERABLE_SCOPES = {}
 #     return scope
 
 
+# noinspection PyPep8Naming
 class reenterable_name_scope(tf.name_scope):
     _existing_scopes = {}
 
@@ -71,7 +72,7 @@ class reenterable_name_scope(tf.name_scope):
         return scope
 
 
-def get_name_scopes(node, same=False):
+def get_name_scopes(node, reenterable_scope=False):
     """Gets the name scopes that this :node: was created in.
 
     A node is created every time a Keras layer is called; in particular through the functional API. Note that the layer
@@ -82,10 +83,10 @@ def get_name_scopes(node, same=False):
     This function allows one to resolve this issue partially: by getting the name scopes that a layer was once
     called in, it can be re-called in those scopes every time subsequently.
 
-    Note that in order to get the previously existing scope, and not just with the same name as before (then made unique
-    by adding a number), then the previous scopes must have been created with reenterable_name_scope, above. The default
-    behaviour is to create a new scope with the same name; if :same: is True then it will seek a reenterable scope
-    instead, and throw a ValueError if the reenterable scope does not exist.
+    Note that in order to get the previously existing scope, and not just with the reenterable_scope name as before
+    (then made unique by adding a number), then the previous scopes must have been created with reenterable_name_scope,
+    above. The default behaviour is to create a new scope with the reenterable_scope name; if :reenterable_scope: is
+    True then it will seek a reenterable scope instead, and throw a ValueError if the reenterable scope does not exist.
 
     Returns a context chaining together every scope that the :node: was called in.
     """
@@ -100,7 +101,7 @@ def get_name_scopes(node, same=False):
                            f'{node.outbound_layer.name}, but produces a tensor {node.output_tensors[0]} with name '
                            f'{node.output_tensors[0].name}.') from e
     scope_list = tensor_name_parts[:index]
-    if same:
+    if reenterable_scope:
         scope_fn = ft.partial(reenterable_name_scope, disallow_nonexistent=True)
     else:
         scope_fn = tf.name_scope
