@@ -53,3 +53,10 @@ def get_name_scope(node):
     index = tensor_name.index(layer_name)
     scope = tensor_name[:index]  # includes trailing slash to make this an absolute scope
     return tf.name_scope(scope)
+
+
+def get_current_scopes():
+    """Gets the name of the current scope."""
+
+    # We wrap this because it's in contrib; we'll need to change this once contrib is depreciated.
+    return tf.contrib.framework.get_name_scope()

@@ -5,25 +5,29 @@ import tools
 from . import misc
 
 
-def chain_layers(*layers_, scope_name=None):
+class chain_layers(keras.layers.Layer):
     """Chains together multiple layers, e.g. f, g and h, so that the return value of this function may be called with an
     input i to in turn return f(g(h(i))).
 
-    This is very nearly the same as composing the given layers: keras.Model does composition, but then when it is
-    subsequently used, it is treated as a single layer; this expands back out into the layers that were put into it.
-    (Visible when calling the summary method, for example.)
+    This is nearly the same as wrapping the layers in a Model - the difference is that that requires cluttering up the
+    graph with many more tensors; this keeps things simpler. (And thus easier to keep track of in TensorBoard!)
     """
 
-    def chained_layers(x):
-        if scope_name is None:
-            scope = tools.WithNothing()
-        else:
-            scope = tf.name_scope(scope_name)
-        with scope:
-            for layer in layers_:
-                x = layer(x)
+    def __init__(self, *layers_, name=None):
+        self.layers = layers_
+        super(chain_layers, self).__init__(name=name)
+
+    def call(self, inputs, **kwargs):
+        x = inputs
+        for layer in self.layers:
+            x = layer(x)
         return x
-    return chained_layers
+
+    def compute_output_shape(self, input_shape):
+        x = input_shape
+        for layer in self.layers:
+            x = layer.compute_output_shape(x)
+        return x
 
 
 def _assert_equal_shape(o1, o2):
@@ -61,7 +65,7 @@ def replace_layers(model, new_layers, recursive=False):
             try:
                 new_layer = new_layers[layer]
             except KeyError:
-                if recursive and hasattr(layer, 'layers'):
+                if recursive and isinstance(layer, keras.Model):
                     new_layer = replace_layers(layer, new_layers, recursive=True)
                 else:
                     new_layer = layer
