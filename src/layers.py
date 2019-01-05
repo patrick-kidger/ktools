@@ -2,10 +2,10 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import tools
 
-from . import misc
+from . import scopes
 
 
-class chain_layers(keras.layers.Layer):
+class ChainLayers(keras.layers.Layer):
     """Chains together multiple layers, e.g. f, g and h, so that the return value of this function may be called with an
     input i to in turn return f(g(h(i))).
 
@@ -13,9 +13,9 @@ class chain_layers(keras.layers.Layer):
     graph with many more tensors; this keeps things simpler. (And thus easier to keep track of in TensorBoard!)
     """
 
-    def __init__(self, *layers_, name=None):
+    def __init__(self, *layers_, name=None, **kwargs):
         self.layers = layers_
-        super(chain_layers, self).__init__(name=name)
+        super(ChainLayers, self).__init__(name=name, **kwargs)
 
     def call(self, inputs, **kwargs):
         x = inputs
@@ -86,7 +86,7 @@ def replace_layers(model, new_layers, recursive=False):
             if len(new_input_tensors) == 1:
                 new_input_tensors = new_input_tensors[0]
             arguments = {} if node.arguments is None else node.arguments
-            with misc.get_name_scope(node):
+            with scopes.get_name_scope(node):
                 new_output_tensors = new_layer(new_input_tensors, **arguments)
             if isinstance(new_output_tensors, tf.Tensor):
                 tools.assert_equal(len(node.output_tensors), 1, error_msg='{o1} does not have length 1')
