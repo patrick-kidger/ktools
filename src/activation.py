@@ -2,11 +2,9 @@ import tensorflow as tf
 import tools
 
 
-def concat_activations(activation_funcs, funcname='concat_activations', default_scope_name='ConcatActivations'):
-    """Creates a new activation function by concatenating the results of the given activation functions together.
-
-    Be careful to distinguish this function from concat_activation.
-    """
+def concat_multiple_activations(activation_funcs, funcname='concat_activations',
+                                default_scope_name='ConcatActivations'):
+    """Creates a new activation function by concatenating the results of the given activation functions together."""
 
     @tools.rename(funcname)
     def concat(features, name=None, axis=-1, **kwargs):
@@ -46,9 +44,19 @@ def concat_activation(activation_func, concat_name=None, default_scope_name=None
         concat_name = f'concat_{activation_func.__name__}'
     if default_scope_name is None:
         default_scope_name = f"Concat{activation_func.__name__.capitalize()}"
-    return concat_activations([activation_func, minus], concat_name, default_scope_name)
+    return concat_multiple_activations([activation_func, minus], concat_name, default_scope_name)
+
+
+def softthresh(features, tau=1.0, name=None):
+    with tf.name_scope(name, "softthresh", [features, tau]) as name:
+        features = tf.convert_to_tensor(features, name="features")
+        minus_tau = tf.convert_to_tensor(-tau, dtype=features.dtype, name="minustau")
+        pos = tf.nn.relu(minus_tau + features, name="pos")
+        neg = tf.nn.relu(minus_tau - features, name="neg")
+        return tf.subtract(pos, neg, name=name)
 
 
 cleaky_relu = concat_activation(tf.nn.leaky_relu)
 celu = concat_activation(tf.nn.elu)
 cselu = concat_activation(tf.nn.selu)
+# No csoftthresh, ctanh etc. because they're already odd functions

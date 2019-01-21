@@ -1,3 +1,11 @@
+from .src.activation import (concat_multiple_activations,
+                             minus_activation,
+                             concat_activation,
+                             cleaky_relu,
+                             celu,
+                             cselu,
+                             softthresh)
+
 from .src.layers import (ChainLayers,
                          replace_layers)
 
