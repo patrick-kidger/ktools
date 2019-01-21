@@ -8,7 +8,7 @@ import tools
 from . import dirs
 
 
-def datagens(batch_size=32, train_datagen=None, validation_datagen=None, base_dir=None):
+def datagens(batch_size=128, train_datagen=None, validation_datagen=None, base_dir=None):
     base_dir = dirs.get(base_dir, 'svhn_norm')
     if train_datagen is None:
         train_datagen = image.ImageDataGenerator(rotation_range=30,
@@ -43,4 +43,11 @@ def datagens(batch_size=32, train_datagen=None, validation_datagen=None, base_di
     validation_generator = validation_datagen.flow(x_test, y_test, batch_size=1)
 
     return tools.Record(train_generator=train_generator, validation_generator=validation_generator,
-                        train_steps=np.ceil(len(x_train) / batch_size), validation_steps=len(x_test))
+                        train_steps=np.ceil(len(x_train) / batch_size), validation_steps=len(x_test),
+                        train_datasize=len(x_train), validation_datasize=len(x_test))
+
+
+# todo: check the label_shape. Seems like it's one higher than it should be. (Probably because '0' is labelled as '10',
+# todo: and I don't think anything is actually labelled '0' in the raw data)?
+feature_shape = (32, 32, 3)
+label_shape = (11,)

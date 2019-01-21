@@ -54,5 +54,9 @@ def datagens(batch_size=128, train_datagen=None, validation_datagen=None, base_d
                                                                   classes=subdirs)
     train_steps = np.ceil(train_filecount / batch_size)
     return tools.Record(train_generator=train_generator, validation_generator=validation_generator,
-                        train_filecount=train_filecount, validation_filecount=validation_filecount,
-                        train_steps=train_steps, validation_steps=validation_filecount)
+                        train_steps=train_steps, validation_steps=validation_filecount,
+                        train_datasize=train_filecount, validation_datasize=validation_filecount)
+
+
+feature_shape = (150, 150, 3)
+label_shape = ()

@@ -5,7 +5,7 @@ import tensorflow.keras.utils as utils
 import tools
 
 
-def datagens(batch_size=32, train_datagen=None, validation_datagen=None):
+def datagens(batch_size=128, train_datagen=None, validation_datagen=None):
     if train_datagen is None:
         train_datagen = image.ImageDataGenerator(rotation_range=30,
                                                  width_shift_range=0.2,
@@ -29,4 +29,9 @@ def datagens(batch_size=32, train_datagen=None, validation_datagen=None):
     validation_generator = validation_datagen.flow(x_test, y_test, batch_size=1)
 
     return tools.Record(train_generator=train_generator, validation_generator=validation_generator,
-                        train_steps=np.ceil(len(x_train) / batch_size), validation_steps=len(x_test))
+                        train_steps=np.ceil(len(x_train) / batch_size), validation_steps=len(x_test),
+                        train_datasize=len(x_train), validation_datasize=len(x_test))
+
+
+feature_shape = (1, 28, 28)
+label_shape = (10,)
