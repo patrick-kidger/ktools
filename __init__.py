@@ -9,6 +9,7 @@ from .src.scopes import (get_name_scope,
                          get_current_scopes)
 
 from .src.visualise import (tb_view,
+                            plot_fn,
                             plot_model_history)
 
 from .src.web import (Knot,
