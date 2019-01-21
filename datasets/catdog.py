@@ -9,9 +9,7 @@ from . import dirs
 
 @ft.lru_cache(maxsize=1)
 def _datagens(base_dir=None):
-    if base_dir is None:
-        base_dir = dirs.get(base_dir)
-    base_dir = os.path.expanduser(base_dir)
+    base_dir = dirs.get(base_dir, 'catdog')
     train_dir = os.path.join(base_dir, 'train')
     validation_dir = os.path.join(base_dir, 'test')
     subdirs = ['cat', 'dog']
@@ -32,7 +30,7 @@ def _datagens(base_dir=None):
     return train_dir, validation_dir, subdirs, train_filecount, validation_filecount
 
 
-def datagens(batch_size=128, train_datagen=None, validation_datagen=None, basedir=None):
+def datagens(batch_size=128, train_datagen=None, validation_datagen=None, base_dir=None):
     """Creates some generators for the data, along with some auxiliary information."""
 
     if train_datagen is None:
@@ -47,7 +45,7 @@ def datagens(batch_size=128, train_datagen=None, validation_datagen=None, basedi
     if validation_datagen is None:
         validation_datagen = image.ImageDataGenerator(preprocessing_function=lambda x: -1 + x / 127.5)  # scale to [-1, 1]
 
-    train_dir, validation_dir, subdirs, train_filecount, validation_filecount = _datagens(basedir)
+    train_dir, validation_dir, subdirs, train_filecount, validation_filecount = _datagens(base_dir)
 
     train_generator = train_datagen.flow_from_directory(directory=train_dir, target_size=(150, 150),
                                                         batch_size=batch_size, class_mode='binary', classes=subdirs)

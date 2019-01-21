@@ -8,3 +8,4 @@ from tensorflow.keras.datasets import (boston_housing,
 
 from . import catdog
 from . import mnist2
+from . import svhn_norm
