@@ -4,7 +4,8 @@ from .src.activation import (concat_multiple_activations,
                              cleaky_relu,
                              celu,
                              cselu,
-                             softthresh)
+                             softthresh,
+                             QuasiIdentity)
 
 from .src.layers import (ChainLayers,
                          replace_layers)

@@ -1,4 +1,8 @@
 import tensorflow as tf
+import tensorflow.keras.activations as activations
+import tensorflow.keras.constraints as constraints
+import tensorflow.keras.initializers as init
+import tensorflow.keras.layers as layers
 import tools
 
 
@@ -59,4 +63,16 @@ def softthresh(features, tau=1.0, name=None):
 cleaky_relu = concat_activation(tf.nn.leaky_relu)
 celu = concat_activation(tf.nn.elu)
 cselu = concat_activation(tf.nn.selu)
-# No csoftthresh, ctanh etc. because they're already odd functions
+# No csoftthresh, ctanh etc. because they're odd functions
+
+
+class QuasiIdentity(layers.PReLU):
+    def __init__(self, activation_func, alpha_initializer=init.Constant(0.5), alpha_regularizer=None, **kwargs):
+        self.activation_func = activations.get(activation_func)
+        if alpha_regularizer == 'convex':
+            kwargs['alpha_regularizer'] = constraints.MinMaxNorm(0, 1)
+        super(QuasiIdentity, self).__init__(alpha_initializer=alpha_initializer, alpha_regularizer=alpha_regularizer,
+                                            **kwargs)
+
+    def call(self, inputs, mask=None):
+        return self.alpha * tf.identity(inputs) + (1 - self.alpha) * self.activation_func(inputs)
