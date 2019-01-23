@@ -16,3 +16,14 @@ def get(dataset_dir, dataset_name):
 
         dataset_dir = getattr(dataset_dirs, dataset_name)
     return os.path.expanduser(dataset_dir)
+
+
+def show(x, y):
+    # lazy import
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.imshow(x)
+    ax.set_title(f'Label: {y}')
+    fig.show()

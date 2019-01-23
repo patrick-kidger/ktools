@@ -3,10 +3,10 @@ import tools
 
 
 class WithTrainable:
-    """A context in which every layer in :layers_: has their trainable flag set to :trainable:."""
+    """A context in which every layer in :layers: has their trainable flag set to :trainable:."""
 
     def __init__(self, layers, trainable=False):
-        self.layers = layers
+        self.layers = list(layers)
         self.trainable = trainable
         self.original_trainables = []
 
