@@ -430,7 +430,8 @@ def deepcopy_web(knots, memodict=None):
         new_knot = knot.clone()
         # do deepcopy our input knots
         if copied_inputs is not None:
-            new_knot(copied_inputs)
+            with tf.name_scope(knot.scope_names):
+                new_knot(copied_inputs)
         return new_knot
 
     if isinstance(knots, (tuple, list)):
