@@ -58,9 +58,12 @@ def datagens(batch_size=128, train_datagen=None, validation_datagen=None, base_d
                         train_datasize=train_filecount, validation_datasize=validation_filecount)
 
 
-def show(batch_size=1, train_datagen=None, validation_datagen=None):
-    d = datagens(batch_size=batch_size, train_datagen=train_datagen, validation_datagen=validation_datagen)
-    x, y = next(d.train_generator)
+def show(data=None, datagen=None):
+    if data is None:
+        d = datagens(batch_size=1, train_datagen=datagen)
+        x, y = next(d.train_generator)
+    else:
+        x, y = data
     x = x[0]  # unpack from batch dimension
     y = y[0]  #
     x = np.round((x + 1) * 127.5).astype(int)  # undo the preprocessing scaling
@@ -73,3 +76,5 @@ def show(batch_size=1, train_datagen=None, validation_datagen=None):
 
 feature_shape = (150, 150, 3)
 label_shape = ()
+
+loss, last_layer_size, last_layer_activation = utils.details(locals())

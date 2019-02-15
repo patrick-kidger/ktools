@@ -35,9 +35,12 @@ def datagens(batch_size=128, train_datagen=None, validation_datagen=None):
                         train_datasize=len(x_train), validation_datasize=len(x_test))
 
 
-def show(batch_size=1, train_datagen=None, validation_datagen=None):
-    d = datagens(batch_size=batch_size, train_datagen=train_datagen, validation_datagen=validation_datagen)
-    x, y = next(d.train_generator)
+def show(data=None, datagen=None):
+    if data is None:
+        d = datagens(batch_size=1, train_datagen=datagen)
+        x, y = next(d.train_generator)
+    else:
+        x, y = data
     x = x[0][0]  # unpack from batch and channel dimensions, which should both be of size 1.
     y = y[0]  # unpack from batch dimension
     y = list(y).index(1)  # undo the effect of to_categorical
@@ -46,3 +49,5 @@ def show(batch_size=1, train_datagen=None, validation_datagen=None):
 
 feature_shape = (1, 28, 28)
 label_shape = (10,)
+
+loss, last_layer_size, last_layer_activation = utils.details(locals())

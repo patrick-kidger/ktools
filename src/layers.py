@@ -5,6 +5,7 @@ import tools
 from . import scopes
 
 
+# TODO: These don't seem to properly contribute to the 'total params' etc. model summaries
 class ChainLayers(keras.layers.Layer):
     """Chains together multiple layers, e.g. f, g and h, so that the return value of this function may be called with an
     input i to in turn return f(g(h(i))).
@@ -13,9 +14,16 @@ class ChainLayers(keras.layers.Layer):
     graph with many more tensors; this keeps things simpler. (And thus easier to keep track of in TensorBoard!)
     """
 
-    def __init__(self, *layers_, name=None, **kwargs):
-        self.layers = layers_
-        super(ChainLayers, self).__init__(name=name, **kwargs)
+    def __init__(self, *layers, **kwargs):
+        self.layers = tuple(layers)
+        super(ChainLayers, self).__init__(**kwargs)
+
+    # TODO: investigate why this throws an error. When using crelu?
+    # def build(self, input_shape):
+    #     shape = input_shape
+    #     for layer in self.layers:
+    #         layer.build(shape)
+    #         shape = layer.compute_output_shape(shape)
 
     def call(self, inputs, **kwargs):
         x = inputs
@@ -28,6 +36,39 @@ class ChainLayers(keras.layers.Layer):
         for layer in self.layers:
             x = layer.compute_output_shape(x)
         return x
+
+    def count_params(self):
+        return sum(layer.count_params() for layer in self.layers)
+
+    def get_config(self):
+        config = super(ChainLayers, self).get_config()
+        # TODO: support serializing and deserializing layers
+        # config['layers'] = tuple(layer.get_config() for layer in self.layers)
+        config['layers'] = self.layers
+        return config
+
+    def get_weights(self):
+        return [weight for layer in self.layers for weight in layer.get_weights()]
+
+    def set_weights(self, weights):
+        for layer in self.layers:
+            num_weights = len(layer.get_weights())
+            layer_weights = weights[:num_weights]
+            weights = weights[num_weights:]
+            layer.set_weights(layer_weights)
+
+
+def chain_layers(*layers):
+    """Lightweight way to chain layers together. See also the ktools.ChainLayers layer, for wrapping them all up inside
+    a full-blown Keras layer.
+    """
+
+    def chained_layers(inputs):
+        x = inputs
+        for layer in layers:
+            x = layer(x)
+        return x
+    return chained_layers
 
 
 def _assert_equal_shape(o1, o2):

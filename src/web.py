@@ -1,7 +1,10 @@
-import ktools
 import tensorflow as tf
 import tensorflow.keras as keras
+import tensorflow.keras.layers as keras_layers
 import tools
+
+from . import misc
+from . import scopes
 
 
 _sentinel = object()  # Used to detect cycles in webs
@@ -76,16 +79,58 @@ class Knot:
         self._output_knots = set()  # Those knots which depend on us, i.e. have us as or in their _input_knots.
         self.scope_names = None
 
-    def clone(self, include_inputs=False):
-        """Creates a clone of the Knot. This means that it will share the same layer, data, and scope names. If
-        :include_inputs: is True then it will also share the same input Knots.
+    def clone(self, inputs=False, layers=False, weights=False):
+        """Creates a clone of the Knot. This means that it will share the same layer, data, and scope names. If :inputs:
+        is True then it will also share the same input Knots. If :layers: is True then the layer will also be cloned
+        (without copying weights). If :weights: is also True then weights will also be copied.
         """
 
-        cloned_self = self.__class__(self.layer, data=self.data)
-        if include_inputs:
+        if layers:
+            if self.input_knots is None:
+                shape = self.layer.shape[1:]  # remove batch dimension
+                dtype = self.layer.dtype
+                if isinstance(self.layer, tf.SparseTensor):
+                    sparse = True
+                    name = 'input'    # Sparse Tensors don't have names, oddly
+                else:
+                    sparse = False
+                    name = self.layer.name.partition(':')[0]
+                layer_ = keras_layers.Input(shape=shape, dtype=dtype, name=name, sparse=sparse)
+            else:
+                config = self.layer.get_config()
+                config['name'] = misc.uniq_name(config['name'])
+                if weights:
+                    config['weights'] = self.layer.get_weights()
+                layer_ = self.layer.__class__.from_config(config)
+        else:
+            layer_ = self.layer
+
+        cloned_self = self.__class__(layer_, data=self.data)
+        if inputs:
             cloned_self(self.input_knots)
         cloned_self.set_scope_names(self.scope_names)
         return cloned_self
+
+    # @staticmethod
+    # def _original_name(name):
+    #     """Takes a name for a Layer or Tensor and returns a name of the same type which can be used to create a new
+    #     Layer or Tensor.
+    #
+    #     For example if :name: is 'dense_3' then this will return 'dense'.
+    #     """
+    #
+    #     try:
+    #         return name.original_string
+    #     except AttributeError:  # If the name is just a string passed to the Input, or not specified.
+    #         name = name.partition(':')[0]  # Get rid of the ':0' suffix if it's present
+    #
+    #         # Strip the disambiguation if it's present
+    #         # This isn't totally foolproof. Nothing stops one from passing 'hello_40' as a name; this is the
+    #         # same name as you'd get if you'd created 41 tensors called 'hello'.
+    #         pieces = name.rpartition('_')
+    #         if pieces[0] != '' and pieces[2].isdigit():  # disambiguation present
+    #             name = pieces[0]
+    #         return name
 
     @property
     def input_knots_list(self):
@@ -105,6 +150,10 @@ class Knot:
         """
 
         return self._input_knots
+
+    @property
+    def output_knots(self):
+        return self._output_knots
 
     @property
     def layer(self):
@@ -137,12 +186,12 @@ class Knot:
 
     def register_current_scopes(self):
         """Sets the absolute scope that the layers will be called in to whatever the current scope is."""
-        self.set_scope_names(ktools.get_current_scopes())
+        self.set_scope_names(scopes.get_current_scopes())
 
     def prepend_current_scopes(self):
         """Sets the absolute scope that the layers will be called in to whatever the current scope is plus whatever the
         Knot currently has stored as the scope."""
-        pieces = [ktools.get_current_scopes()]
+        pieces = [scopes.get_current_scopes()]
         if self.scope_names:  # in particular not '' or None
             pieces.append(self.scope_names)
         self.set_scope_names('/'.join(pieces))
@@ -153,7 +202,7 @@ class Knot:
     def _remove_output_knot(self, knot):
         self._output_knots.remove(knot)
 
-    def __call__(self, input_):
+    def __call__(self, input_, register_scopes=True):
         """Call the Knot as you would a Keras layer; see Knot.__doc__.
 
         Arguments:
@@ -170,7 +219,8 @@ class Knot:
         else:
             assert isinstance(input_, Knot)
 
-        self.register_current_scopes()
+        if register_scopes:
+            self.register_current_scopes()
 
         for inp in self.input_knots_list:
             # noinspection PyProtectedMember
@@ -191,7 +241,8 @@ class Knot:
         """
         self.replace_multi([knot], knot)
 
-    def replace_multi(self, input_knots, output_knot):
+    # todo: document the fact that we have to clone self if its used in between last knot and first knots
+    def replace_multi(self, first_knots, last_knot):
         """Replaces this Knot's spot in the web with multiple other Knots.
 
         The idea is usually that the given input knots and output Knot will be connected to each other - indeed, may
@@ -199,24 +250,35 @@ class Knot:
         web if desired.
 
         Arguments:
-            input_knots: A Knot or list or tuple of Knots, which will take on the inputs of the existing Knot.
-            output_knot: A Knot which will replace this Knot in all outputs of the existing Knot.
+            first_knots: A Knot or list or tuple of Knots, which will take on the inputs of the existing Knot.
+            last_knot: A Knot which will replace this Knot in all outputs of the existing Knot.
         """
 
-        if not isinstance(input_knots, (tuple, list)):
-            input_knots = [input_knots]
-        if self.input_knots:
-            # have the input knots inherit our input, and have the input depend on it.
-            for knot in input_knots:
-                knot(self.input_knots)
+        if not isinstance(first_knots, (tuple, list)):
+            first_knots = [first_knots]
+
+        # have our current input knots forget about us
         for inp in self.input_knots_list:
             # noinspection PyProtectedMember
             inp._remove_output_knot(self)
-        for n in self._output_knots:  # update our outputs to depend on the new output knot instead
+
+        # have the input knots inherit our input, and have the input depend on it.
+        if self.input_knots:
+            for knot in first_knots:
+                knot(self.input_knots, register_scopes=False)
+
+        # update our outputs to depend on the new output knot instead
+        for n in self.output_knots:
             if isinstance(n._input_knots, (tuple, list)):
-                n._input_knots = [output_knot if x is self else x for x in n._input_knots]
+                n._input_knots = [last_knot if x is self else x for x in n._input_knots]
             else:
-                n._input_knots = output_knot
+                n._input_knots = last_knot
+
+        # let the last knot know that its output knots are our output knots
+        for output_knot in self.output_knots:
+            last_knot._add_output_knot(output_knot)
+
+        # remove our own connections
         self._input_knots = None
         self._output_knots = set()
 
@@ -314,16 +376,16 @@ class Knot:
 
         return model_web(self, input_knots)
 
-    def __deepcopy__(self, memodict=None):
-        return deepcopy_web(self, memodict)
+    def __deepcopy__(self, memodict=None, layers=False, weights=False):
+        return deepcopy_web(self, memodict, layers=layers, weights=weights)
 
-    def deepcopy(self, memodict=None):
+    def deepcopy(self, memodict=None, layers=False, weights=False):
         """See deepcopy_web.__doc__.
 
         Makes a deepcopy of this Knot and all Knots 'earlier' than it.
         """
 
-        return self.__deepcopy__(memodict)
+        return self.__deepcopy__(memodict, layers=layers, weights=weights)
 
     def to_networkx(self):
         """Converts this Knot and all 'earlier' knots to a NetworkX graph; see networkx_web.__doc__ for more
@@ -408,7 +470,7 @@ def model_web(output_knots, input_knots=None):
     return model
 
 
-def deepcopy_web(knots, memodict=None):
+def deepcopy_web(knots, memodict=None, layers=False, weights=False):
     """Creates a deepcopy of the web.
 
     Copies the specified Knots and all Knots 'earlier' in the web, in the sense of Knot.map_web.__doc__, and returns the
@@ -420,6 +482,9 @@ def deepcopy_web(knots, memodict=None):
             all Knots 'earlier' than them as well.)
         memodict: The memorisation dictionary, in the sense of Knot.map_web.__doc__. Passing a known dictionary
         allows for accessing the key: value pairs corresponding to what Knot has been copied to create what Knot.
+        layers: Whether to copy the layers or use the same layer. Defaults to False.
+        weights: If copying layers, whether to also copy their weights, or let the weights in the new layer initialize
+            as before. Defaults to False, i.e. no copying.
 
     Returns:
         The copies of :knots:, either as a single Knot or as a list of Knots, depending on the input format.
@@ -427,7 +492,7 @@ def deepcopy_web(knots, memodict=None):
 
     def deepcopy_fn(knot, copied_inputs, _):
         # don't copy the layers and such
-        new_knot = knot.clone()
+        new_knot = knot.clone(layers=layers, weights=weights)
         # do deepcopy our input knots
         if copied_inputs is not None:
             with tf.name_scope(knot.scope_names):

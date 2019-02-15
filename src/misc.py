@@ -1,4 +1,4 @@
-import tensorflow.keras as keras
+import tensorflow.keras.initializers as init
 import tools
 
 
@@ -20,18 +20,25 @@ class WithTrainable:
             layer.trainable = original_trainable
 
 
-class TransformedSequence(keras.utils.Sequence):
-    """Creates a new keras.utils.Sequence that applies a transformation to a previous one."""
-
-    def __init__(self, sequence, transform):
-        self.sequence = sequence
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.sequence)
-
-    def __getitem__(self, item):
-        return self.transform(self.sequence[item])
+uniq_name = tools.UniqueString(format_string='{string}__{index}')
 
 
-uniq_name = tools.UniqueString()
+class NearIdentity(init.Initializer):
+    identity = init.Identity()
+
+    def __init__(self, noise=init.truncated_normal(stddev=0.001)):
+        self.noise = init.get(noise)
+
+    def __call__(self, shape, dtype=None, partition_info=None):
+        i = self.identity(shape, dtype, partition_info)
+        n = self.noise(shape, dtype, partition_info)
+        return i + n
+
+    def get_config(self):
+        return {'noise': self.noise.get_config()}
+
+
+# So that keras.initializers.get works.
+# https://github.com/keras-team/keras/issues/3867
+init.get.__globals__['NearIdentity'] = NearIdentity
+# What an awful hack.

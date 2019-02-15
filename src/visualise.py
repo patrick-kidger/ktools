@@ -37,18 +37,22 @@ def tb_view(model, logdir=None, cmd=None):
     thread.join()
 
 
-def plot_fn(fn, domain=(-2, 2), num_points=401):
+def plot_fn(fn, domain=(-2, 2), num_points=401, tensorflow=False, vector=False):
     """Plots the given univariate :fn: on the given :domain: at :num_points: equally-spaced points."""
 
     x = np.linspace(domain[0], domain[1], num_points)
-    with tf.Session(graph=tf.Graph()) as sess:
-        y = fn(x)
-        if isinstance(y, tf.Tensor):
+    with tf.Session(graph=tf.Graph()) if tensorflow else tools.WithNothing() as sess:
+        if vector:
+            y = fn(x)
+        else:
+            y = [fn(xi) for xi in x]
+        if tensorflow:
             y = sess.run(y)
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
     ax.plot(x, y)
     fig.show()
+    return fig, ax
 
 
 # http://parneetk.github.io/blog/cnn-cifar10/
