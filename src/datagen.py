@@ -53,16 +53,38 @@ class MultiprocessGenerator:
     def __init__(self, generator, workers=8, max_queue_size=10):
         """Runs multiple copies of the given :generator: in :workers: number of separate processes."""
 
-        def gen(i):
+        def gen(i, num_workers):
             def gen_():
-                np.random.seed(i)
+                # So each process often has to know its identity, and how many other workers there are, for example to
+                # avoid duplicating data. How best to let them know?
+                # We could call some method of the generator: generator.set_id(...), but then not only does every
+                # generator we want to use have to support this method, but _also_ every generator which wraps other
+                # generators does as well. For example batch_generator, below. And we don't really want to have to
+                # mandate that every generator we care to use should supply this method, or be wrapped in a class
+                # supplying this method.
+                # So the alternative is to store this information as global state somewhere. (Yes yes, yuck. But the
+                # identity of a process is a fundamentally global-level piece of information. If anything actually it is
+                # slightly more than global, as it is invariant across an entire kernel, not just a module.) The obvious
+                # place to put this would be as an attribute on the multiprocessing module, but the multiprocessing
+                # module offers several 'contexts' in which it can work, each of which is essentially a fake of the
+                # true multiprocessing module, just copying its interface. So it's actually nontrivial (although still
+                # not terribly hard) to get access to the 'same' multiprocessing module everywhere. So the next most
+                # obvious place to put the attribute is on the sys module, which is what we do.
+                import sys
+                if hasattr(sys, '_WORKER_ID'):
+                    raise RuntimeError('sys module already has _WORKER_ID attribute')
+                if hasattr(sys, '_WORKER_COUNT'):
+                    raise RuntimeError('sys module already has _WORKER_COUNT attribute')
+                sys._WORKER_ID = i
+                sys._WORKER_COUNT = num_workers
                 random.seed(i)
+                np.random.seed(i)
                 while True:
                     self._queue.put(next(generator))
             return gen_
 
         self._queue = mp.Queue(maxsize=max_queue_size)
-        self._processes = [mp.Process(target=gen(i)) for i in range(workers)]
+        self._processes = [mp.Process(target=gen(i, workers)) for i in range(workers)]
 
         self._started = False
         self._terminated = False
