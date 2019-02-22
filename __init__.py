@@ -11,13 +11,26 @@ from .src.datagen import (TransformedSequence,
                           batch_generator,
                           MultiprocessGenerator)
 
+from .src.initializers import NearIdentity
+
 from .src.layers import (ChainLayers,
                          chain_layers,
-                         replace_layers)
+                         Periodize,
+                         PeriodicConv1D,
+                         PeriodicConv2D,
+                         PeriodicSeparableConv1D,
+                         PeriodicSeparableConv2D,
+                         PeriodicDepthwiseConv2D,
+                         PeriodicConv2DTranspose,
+                         PeriodicConv3D,
+                         PeriodicConv3DTranspose,
+                         replace_layers,
+                         dense_block,
+                         residual_layers)
 
 from .src.misc import (WithTrainable,
                        uniq_name,
-                       NearIdentity)
+                       periodize)
 
 from .src.scopes import (get_name_scope,
                          get_current_scopes)

@@ -1,7 +1,11 @@
+import functools as ft
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
+import tensorflow.keras.layers as layers
 import tools
 
+from . import misc
 from . import scopes
 
 
@@ -18,7 +22,7 @@ class ChainLayers(keras.layers.Layer):
         self.layers = tuple(layers)
         super(ChainLayers, self).__init__(**kwargs)
 
-    # TODO: investigate why this throws an error. When using crelu?
+    # TODO: investigate why this throws an error. Possibly because of using crelu?
     # def build(self, input_shape):
     #     shape = input_shape
     #     for layer in self.layers:
@@ -69,6 +73,50 @@ def chain_layers(*layers):
             x = layer(x)
         return x
     return chained_layers
+
+
+def Periodize(kernel_size, data_format):
+    """Periodizes the input with a margin suitable for the specified kernel_size."""
+
+    margin_sizes = []
+    for k_size in kernel_size:
+        margin_sizes.append((int(np.floor((k_size - 1) / 2)), int(np.ceil((k_size - 1) / 2))))
+    # no margin on the batch or channel dimensions
+    if data_format == 'channels_last':
+        margins = tuple([0, *margin_sizes, 0])
+    else:  # channels_first
+        margins = tuple([0, 0, *margin_sizes])
+    periodize = ft.partial(misc.periodize, margin_size=margins)
+    return layers.Lambda(periodize, name=misc.uniq_name('periodize'))
+
+
+def _make_periodic_conv(conv, dimension):
+    @tools.rename(f'Periodic{conv.__name__}')
+    def PeriodicConv(filters, kernel_size, strides=1, padding='periodic', data_format='channels_last', *args, **kwargs):
+        f"""As the usual {conv}, but also supports the padding option 'periodic'."""
+
+        if isinstance(kernel_size, int):
+            kernel_size = [kernel_size] * dimension
+        layer_list = []
+        if padding == 'periodic':
+            padding = 'valid'
+            layer_list.append(Periodize(kernel_size, data_format))
+        conv_layer = conv(filters=filters, kernel_size=kernel_size, strides=strides, padding=padding,
+                          data_format=data_format, *args, **kwargs)
+        layer_list.append(conv_layer)
+        # TODO: switch to the true ChainLayers once that's working a little better
+        return chain_layers(*layer_list)
+    return PeriodicConv
+
+
+PeriodicConv1D = _make_periodic_conv(layers.Conv1D, 1)
+PeriodicConv2D = _make_periodic_conv(layers.Conv2D, 2)
+PeriodicSeparableConv1D = _make_periodic_conv(layers.SeparableConv1D, 1)
+PeriodicSeparableConv2D = _make_periodic_conv(layers.SeparableConv2D, 2)
+PeriodicDepthwiseConv2D = _make_periodic_conv(layers.DepthwiseConv2D, 2)
+PeriodicConv2DTranspose = _make_periodic_conv(layers.Conv2DTranspose, 2)
+PeriodicConv3D = _make_periodic_conv(layers.Conv3D, 3)
+PeriodicConv3DTranspose = _make_periodic_conv(layers.Conv3DTranspose, 3)
 
 
 def _assert_equal_shape(o1, o2):
@@ -145,3 +193,68 @@ def replace_layers(model, new_layers, recursive=False):
                                    f'that the original layer returned are {node.output_tensors}.')
 
     return keras.Model(inputs=model.inputs, outputs=[old_to_new[o] for o in model.outputs])
+
+
+def dense_block(size, activation):
+    """Creates a basic dense layer in the network: BatchNorm, then Activation, then Dense. The Actiation will be
+    :activation: and the Dense will have size :size: and no activation.
+    """
+    return chain_layers(layers.BatchNormalization(renorm=True),
+                        layers.Activation(activation=activation),
+                        layers.Dense(size))
+
+
+def _dense_change_size(size, activation):
+    return layers.Dense(int(size[-1]))
+
+
+def residual_layers(make_block=dense_block, change_size=_dense_change_size,
+                    hidden_blocks=((512, 512), (512, 512), (512, 512), (512, 512)),
+                    reshape='necessary', activation=tf.nn.crelu):
+    """Returns a wrapper which creates a collection of residual layers when called on a tf.Tensor x.
+
+    Arguments:
+        make_block: A function taking two arguments, 'size' and 'activation', and returns a callable, such as a Keras
+            Layer, which takes a tf.Tensor as input and returns a tf.Tensor as output. It will be called with each of
+            the integers in 'hidden_blocks' as the 'size' argument, and 'activation' as the 'activation' argument.
+        change_size: A function of the same form as make_block. Will be called whenever reshaping is necessary to
+            perform the addition part of a ResNet. (Because the size of the output of the previous block is not the same
+            size as the input to the block.) Unused in reshape='never'.
+        hidden_blocks: A nested structure of tuples and integers, defining the sizes of the layers of the ResNet. If the
+            entry of the tuple is an integer, then it corresponds to a layer of that size being created (via the
+            make_block function). If the entry is a tuple then residual_layers is called recursively on the tuple, and
+            the result added on in the manner of ResNets. i.e. setting hidden_blocks=(4, (3, 3)) would
+            generate the following structure, with 'a' denoting the argument 'activation':
+
+                                        --> make_block(3, a) -> make_block(3, a) --\
+                                       /                                           v
+            input -> make_block(4, a) -------------> change_size(3, a) ----------> add -> output
+
+        reshape: One of 'always', 'necessary' or 'never'. If it is 'always' then change_size will always be called
+            during the 'identity' part of the ResNet. If it is 'necessary' then it will be called only when necessary
+            to perform the addition. If it is 'never' then change_size will not be used, and an Exception raised if the
+            sizes do not allow addition.
+        activation: The activation function to use throughout; passed as an argument to make_block and change_size.
+
+    Returns:
+        A tf.Tensor that is the output of the set of residual blocks.
+    """
+
+    if reshape not in ('always', 'necessary', 'never'):
+        raise ValueError(f"reshape should be one of 'always', 'necessary' or 'never'.")
+
+    def wrapper(x):
+        for hidden_sizes in hidden_blocks:
+            if isinstance(hidden_sizes, int):
+                x = make_block(hidden_sizes, activation)(x)
+            elif isinstance(hidden_sizes, (tuple, list)):
+                y = x
+                x = residual_layers(make_block, change_size, hidden_sizes, reshape, activation)(x)
+                if reshape == 'always':
+                    y = change_size(x.shape, activation)(y)
+                elif reshape == 'necessary':
+                    if x.shape[1:] != y.shape[1:]:  # remove batch dimension
+                        y = change_size(x.shape, activation)(y)
+                x = layers.Add()([x, y])
+        return x
+    return wrapper

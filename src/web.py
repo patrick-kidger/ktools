@@ -111,27 +111,6 @@ class Knot:
         cloned_self.set_scope_names(self.scope_names)
         return cloned_self
 
-    # @staticmethod
-    # def _original_name(name):
-    #     """Takes a name for a Layer or Tensor and returns a name of the same type which can be used to create a new
-    #     Layer or Tensor.
-    #
-    #     For example if :name: is 'dense_3' then this will return 'dense'.
-    #     """
-    #
-    #     try:
-    #         return name.original_string
-    #     except AttributeError:  # If the name is just a string passed to the Input, or not specified.
-    #         name = name.partition(':')[0]  # Get rid of the ':0' suffix if it's present
-    #
-    #         # Strip the disambiguation if it's present
-    #         # This isn't totally foolproof. Nothing stops one from passing 'hello_40' as a name; this is the
-    #         # same name as you'd get if you'd created 41 tensors called 'hello'.
-    #         pieces = name.rpartition('_')
-    #         if pieces[0] != '' and pieces[2].isdigit():  # disambiguation present
-    #             name = pieces[0]
-    #         return name
-
     @property
     def input_knots_list(self):
         """All of the input knots as a list which may be iterated over."""
