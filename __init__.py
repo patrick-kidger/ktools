@@ -30,7 +30,8 @@ from .src.layers import (ChainLayers,
 
 from .src.misc import (WithTrainable,
                        uniq_name,
-                       periodize)
+                       periodize,
+                       periodic_convolve)
 
 from .src.scopes import (get_name_scope,
                          get_current_scopes)

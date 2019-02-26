@@ -24,6 +24,8 @@ class WithTrainable:
 uniq_name = tools.UniqueString(format_string='{string}__{index}')
 
 
+# This is similar to numpy.pad(..., mode='wrap'). Sadly TensorFlow doesn't support this mode in tf.pad yet, so this
+# works instead.
 # idea taken from https://stackoverflow.com/questions/39088489/tensorflow-periodic-padding
 def periodize(tensor_to_periodize, margin_size):
     """Periodize the given tensor; that is, give it a margin that is filled in with values taken from the opposite side
@@ -120,3 +122,17 @@ def periodize(tensor_to_periodize, margin_size):
         tensor_to_periodize = tf.transpose(tensor_to_periodize, perm)
 
     return tensor_to_periodize
+
+
+def periodic_convolve(input, filter):
+    """Similar to the tf.nn.convolution op, but without the faff. Similar to scipy.ndimage.correlate."""
+
+    # int(size) to unpack from tf.Dimension
+    padding = tuple(int((int(size) - 1) / 2) for size in filter.shape)
+    y_periodized = periodize(input, padding)  # to make it a periodic convolution when used with VALID padding
+    y_expanded1 = tf.expand_dims(y_periodized, 0)  # batch dimension
+    y_expanded2 = tf.expand_dims(y_expanded1, -1)  # channel dimension
+    filter2 = tf.expand_dims(filter, -1)  # in-channel dimension
+    filter3 = tf.expand_dims(filter2, -1)  # out-channel dimension
+    conv = tf.nn.convolution(y_expanded2, filter3, 'VALID')
+    return tf.squeeze(conv, axis=[0, -1])
