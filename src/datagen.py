@@ -119,7 +119,7 @@ class MultiprocessGenerator:
             raise RuntimeError(f'{self.__class__} has not yet been started; cannot iterate on it.')
         if self._terminated:
             raise RuntimeError(f'{self.__class__} has already been terminated; cannot iterate on it.')
-        return self._queue.get(timeout=5)
+        return self._queue.get()
 
     def __enter__(self):
         return self.start()
@@ -171,13 +171,15 @@ def _map_structures(objs, modify=lambda objs: [obj_i.shape for obj_i in objs]):
 # # calling its batch method. Now this does sound like a reasonable option. But even besides how painful it is to
 # specify the types/shapes to its liking (I never did figure out how to make it handle a feature that's a list; I had to
 # use dictionaries for multiple features), it's also super slow. When generating a small dataset
-# (of full size (100 000, 2)), then I found my solution took 8s whilst tf.data.Dataset took 36s.
+# (of shape (100000, 2)), then I found my solution took 8s whilst tf.data.Dataset took 36s.
 
 def batch_generator(generator, batch_size=128):
     """Takes a :generator: generating individual samples and batches them up into batches of size :batch_size:."""
 
     while True:
         features, labels = zip(*[next(generator) for _ in range(batch_size)])
+        # TODO: find a way to speed this up - only map the structure once? Might require some metaprogramming to do
+        # efficiently.
         batch_features = _map_structures(features, modify=np.stack)
         labels_features = _map_structures(labels, modify=np.stack)
         yield batch_features, labels_features

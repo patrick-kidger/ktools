@@ -1,4 +1,3 @@
-import functools as ft
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -86,8 +85,7 @@ def Periodize(kernel_size, data_format):
         margins = tuple([0, *margin_sizes, 0])
     else:  # channels_first
         margins = tuple([0, 0, *margin_sizes])
-    periodize = ft.partial(misc.periodize, margin_size=margins)
-    return layers.Lambda(periodize, name=misc.uniq_name('periodize'))
+    return layers.Lambda(misc.periodize, name=misc.uniq_name('periodize'), arguments={'margin_size': margins})
 
 
 def _make_periodic_conv(conv, dimension):
