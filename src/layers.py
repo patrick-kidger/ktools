@@ -194,7 +194,7 @@ def replace_layers(model, new_layers, recursive=False):
 
 
 def dense_block(size, activation):
-    """Creates a basic dense layer in the network: BatchNorm, then Activation, then Dense. The Actiation will be
+    """Creates a basic dense layer in the network: BatchNorm, then Activation, then Dense. The Activation will be
     :activation: and the Dense will have size :size: and no activation.
     """
     return chain_layers(layers.BatchNormalization(renorm=True),
@@ -203,7 +203,7 @@ def dense_block(size, activation):
 
 
 def _dense_change_size(size, activation):
-    return layers.Dense(int(size[-1]))
+    return layers.Dense(int(size[-1]), use_bias=False)
 
 
 def residual_layers(make_block=dense_block, change_size=_dense_change_size,

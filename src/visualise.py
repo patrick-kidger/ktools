@@ -23,7 +23,11 @@ def tb_view(model, logdir=None, cmd=None):
 
     if logdir is None:
         logdir = f'/tmp/{tools.uuid2()}'
-    tf.summary.FileWriter(logdir=logdir, graph=model.input.graph).flush()
+    inp = model.input
+    if isinstance(inp, (tuple, list)):
+        inp = inp[0]
+    graph = inp.graph
+    tf.summary.FileWriter(logdir=logdir, graph=graph).flush()
 
     def run_tensorboard():
         if cmd:
