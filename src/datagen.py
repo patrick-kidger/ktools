@@ -89,8 +89,22 @@ class MultiprocessGenerator:
         self._started = False
         self._terminated = False
 
+    @property
+    def started(self):
+        return self._started
+
+    @property
+    def terminated(self):
+        return self._terminated
+
     def start(self):
         """Starts the processes which populate this generator."""
+
+        if self._started:
+            raise RuntimeError(f'{self.__class__} has already been started; cannot start it again.')
+
+        if self._terminated:
+            raise RuntimeError(f'{self.__class__} has already been terminated; cannot start it.')
 
         self._started = True
         for process in self._processes:
@@ -99,17 +113,24 @@ class MultiprocessGenerator:
         return self  # for chaining
 
     def __del__(self):
-        self.terminate()
+        # Not a completely thread-safe way of doing this, admittedly.
+        if self._started and not self._terminated:
+            self.terminate()
 
     def terminate(self):
         """Terminates the processes which populate this generator."""
 
-        if self._started and not self._terminated:
-            for process in self._processes:
-                process.terminate()
-                process.join()
-            self._queue.close()
-            self._terminated = True
+        if not self._started:
+            raise RuntimeError(f'{self.__class__} has not been started; cannot terminate it.')
+
+        if self._terminated:
+            raise RuntimeError(f'{self.__class__} has already been terminated; cannot terminate it again.')
+
+        for process in self._processes:
+            process.terminate()
+            process.join()
+        self._queue.close()
+        self._terminated = True
 
     def __iter__(self):
         return self

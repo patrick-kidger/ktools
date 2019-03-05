@@ -48,7 +48,7 @@ class NearIdentity(init.Initializer):
         return result
 
     def get_config(self):
-        return {'noise': self.noise.get_config()}
+        return {'noise': {'class_name': self.noise.__class__.__name__, 'config': self.noise.get_config()}}
 
 
 # So that keras.initializers.get works.
