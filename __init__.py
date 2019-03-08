@@ -26,6 +26,7 @@ from .src.layers import (ChainLayers,
                          PeriodicConv3DTranspose,
                          replace_layers,
                          dense_block,
+                         dense_change_size,
                          residual_layers)
 
 from .src.misc import (WithTrainable,

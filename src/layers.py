@@ -71,6 +71,8 @@ def chain_layers(*layers):
         for layer in layers:
             x = layer(x)
         return x
+    # To allow lookup later, if need be.
+    chained_layers.layers = layers
     return chained_layers
 
 
@@ -89,6 +91,7 @@ def Periodize(kernel_size, data_format):
 
 
 def _make_periodic_conv(conv, dimension):
+    # TODO: make this actually act like the convolutional layer, e.g. calling methods etc.
     @tools.rename(f'Periodic{conv.__name__}')
     def PeriodicConv(filters, kernel_size, strides=1, padding='periodic', data_format='channels_last', *args, **kwargs):
         f"""As the usual {conv}, but also supports the padding option 'periodic'."""
@@ -103,7 +106,9 @@ def _make_periodic_conv(conv, dimension):
                           data_format=data_format, *args, **kwargs)
         layer_list.append(conv_layer)
         # TODO: switch to the true ChainLayers once that's working a little better
-        return chain_layers(*layer_list)
+        chained_layers = chain_layers(*layer_list)
+        chained_layers.conv_layer = conv_layer
+        return chained_layers
     return PeriodicConv
 
 
@@ -202,11 +207,11 @@ def dense_block(size, activation):
                         layers.Dense(size))
 
 
-def _dense_change_size(size, activation):
+def dense_change_size(size, activation):
     return layers.Dense(int(size[-1]), use_bias=False)
 
 
-def residual_layers(make_block=dense_block, change_size=_dense_change_size,
+def residual_layers(make_block=dense_block, change_size=dense_change_size,
                     hidden_blocks=((512, 512), (512, 512), (512, 512), (512, 512)),
                     reshape='necessary', activation=tf.nn.crelu):
     """Returns a wrapper which creates a collection of residual layers when called on a tf.Tensor x.

@@ -79,8 +79,12 @@ class MultiprocessGenerator:
                 sys._WORKER_COUNT = num_workers
                 random.seed(i)
                 np.random.seed(i)
-                while True:
-                    self._queue.put(next(generator))
+                try:
+                    while True:
+                        self._queue.put(next(generator))
+                except KeyboardInterrupt:
+                    # quit gracefully without traceback spam
+                    pass
             return gen_
 
         self._queue = mp.Queue(maxsize=max_queue_size)

@@ -66,11 +66,12 @@ cselu = concat_activation(tf.nn.selu)
 # No csoftthresh, ctanh etc. because they're odd functions
 
 # Awful hackiness to make Keras deserialization work
-activations.get.__globals__['softthresh'] = softthresh
-activations.get.__globals__['crelu'] = tf.nn.crelu
-activations.get.__globals__['cleaky_relu'] = cleaky_relu
-activations.get.__globals__['celu'] = celu
-activations.get.__globals__['cselu'] = cselu
+tools.safe_add(activations.get.__globals__, 'identity', tf.identity)
+tools.safe_add(activations.get.__globals__, 'softthresh', softthresh)
+tools.safe_add(activations.get.__globals__, 'crelu', tf.nn.crelu)
+tools.safe_add(activations.get.__globals__, 'cleaky_relu', cleaky_relu)
+tools.safe_add(activations.get.__globals__, 'celu', celu)
+tools.safe_add(activations.get.__globals__, 'cselu', cselu)
 
 
 class QuasiIdentity(layers.PReLU):

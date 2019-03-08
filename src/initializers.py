@@ -1,6 +1,6 @@
-import numpy as np
 import tensorflow as tf
 import tensorflow.keras.initializers as init
+import tools
 
 
 class NearIdentity(init.Initializer):
@@ -53,5 +53,5 @@ class NearIdentity(init.Initializer):
 
 # So that keras.initializers.get works.
 # https://github.com/keras-team/keras/issues/3867
-init.get.__globals__['NearIdentity'] = NearIdentity
+tools.safe_add(init.get.__globals__, 'NearIdentity', NearIdentity)
 # What an awful hack.
